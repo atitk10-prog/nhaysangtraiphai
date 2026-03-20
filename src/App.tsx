@@ -121,49 +121,45 @@ export default function App() {
     } catch {}
   };
 
-  // BGM management — single effect watching both url and state
+  // BGM: create audio when URL changes
+  const bgmUrlRef = useRef('');
   useEffect(() => {
-    // Not playing or no music → pause & exit
-    if (gameState !== 'PLAYING' || !bgmUrl) {
-      if (bgmRef.current) {
-        bgmRef.current.pause();
-      }
-      return;
-    }
+    if (bgmUrl === bgmUrlRef.current) return; // same URL, skip
+    bgmUrlRef.current = bgmUrl;
     
-    // Already playing the same URL → resume
-    if (bgmRef.current && bgmRef.current.src === bgmUrl) {
-      bgmRef.current.volume = bgmVolume;
-      bgmRef.current.play().catch(() => {});
-      return;
-    }
-    
-    // New URL or first time → create new Audio
+    // Stop old audio
     if (bgmRef.current) {
       bgmRef.current.pause();
       bgmRef.current = null;
     }
+    if (!bgmUrl) return;
     
+    // Create new audio
     const audio = new Audio(bgmUrl);
     audio.loop = true;
     audio.volume = bgmVolume;
     bgmRef.current = audio;
-    
-    // Play when ready
-    audio.addEventListener('canplay', () => {
-      audio.play().catch((e) => console.warn('BGM play error:', e));
-    }, { once: true });
-    
-    // Also try immediately (might already be cached)
-    audio.play().catch(() => {});
-    
-    return () => {
-      audio.pause();
-      audio.src = '';
-      if (bgmRef.current === audio) bgmRef.current = null;
-    };
-  }, [gameState, bgmUrl]);
+    console.log('BGM: audio created', bgmUrl.substring(0, 50));
+  }, [bgmUrl]);
 
+  // BGM: play/pause based on game state
+  useEffect(() => {
+    const audio = bgmRef.current;
+    if (!audio) return;
+    
+    if (gameState === 'PLAYING') {
+      audio.volume = bgmVolume;
+      console.log('BGM: trying to play...');
+      audio.play()
+        .then(() => console.log('BGM: playing!'))
+        .catch((e) => console.warn('BGM: play blocked -', e.message));
+    } else {
+      audio.pause();
+      console.log('BGM: paused (state:', gameState, ')');
+    }
+  }, [gameState]);
+
+  // BGM: volume control
   useEffect(() => {
     if (bgmRef.current) bgmRef.current.volume = bgmVolume;
   }, [bgmVolume]);
