@@ -10,28 +10,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
-        manifest: {
-          name: 'AI Head Tilt Quiz',
-          short_name: 'TiltQuiz',
-          description: 'A quiz game where you answer by tilting your head left or right using AI face tracking.',
-          theme_color: '#10b981',
-          icons: [
-            {
-              src: 'pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png'
-            },
-            {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png'
-            }
-          ]
-        }
-      })
+      // PWA disabled — no icons available
     ],
     define: {
       'process.env.GROQ_API_KEY': JSON.stringify(env.GROQ_API_KEY),
