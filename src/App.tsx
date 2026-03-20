@@ -41,11 +41,8 @@ export default function App() {
   // Sound settings
   const [sfxVolume, setSfxVolume] = useState(0.5);
   const [bgmVolume, setBgmVolume] = useState(0.2);
-  const [bgmBuffer, setBgmBuffer] = useState<AudioBuffer | null>(null);
-  const [bgmUrl, setBgmUrl] = useState(''); // just for UI display
-  const bgmSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const bgmGainRef = useRef<GainNode | null>(null);
-  const bgmRef = useRef<HTMLAudioElement | null>(null); // keep for compatibility
+  const [bgmUrl, setBgmUrl] = useState('');
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -124,50 +121,31 @@ export default function App() {
     } catch {}
   };
 
-  // BGM: play/stop using AudioContext (same as SFX)
-  const stopBgm = () => {
-    if (bgmSourceRef.current) {
-      try { bgmSourceRef.current.stop(); } catch {}
-      bgmSourceRef.current = null;
+  // BGM: simple play/pause
+  const playBgm = () => {
+    if (bgmAudioRef.current) {
+      bgmAudioRef.current.volume = bgmVolume;
+      bgmAudioRef.current.play().catch(() => {});
+    }
+  };
+  const pauseBgm = () => {
+    if (bgmAudioRef.current) {
+      bgmAudioRef.current.pause();
     }
   };
 
+  // BGM: auto play/pause on gameState change
   useEffect(() => {
-    // Only play when PLAYING + has buffer
-    if (gameState !== 'PLAYING' || !bgmBuffer) {
-      stopBgm();
-      return;
+    if (gameState === 'PLAYING') {
+      playBgm();
+    } else {
+      pauseBgm();
     }
-    
-    // Create AudioContext if needed
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    
-    // Create gain node for volume
-    const gainNode = ctx.createGain();
-    gainNode.gain.value = bgmVolume;
-    gainNode.connect(ctx.destination);
-    bgmGainRef.current = gainNode;
-    
-    // Create source and play
-    const source = ctx.createBufferSource();
-    source.buffer = bgmBuffer;
-    source.loop = true;
-    source.connect(gainNode);
-    source.start(0);
-    bgmSourceRef.current = source;
-    console.log('BGM: playing via AudioContext!');
-    
-    return () => {
-      try { source.stop(); } catch {}
-      bgmSourceRef.current = null;
-      bgmGainRef.current = null;
-      ctx.close();
-    };
-  }, [gameState, bgmBuffer]);
+  }, [gameState]);
 
   // BGM: volume control
   useEffect(() => {
-    if (bgmGainRef.current) bgmGainRef.current.gain.value = bgmVolume;
+    if (bgmAudioRef.current) bgmAudioRef.current.volume = bgmVolume;
   }, [bgmVolume]);
 
   // Save questions to localStorage
@@ -298,22 +276,19 @@ export default function App() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'audio/*';
-    input.onchange = async (e) => {
+    input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      try {
-        // Read file as ArrayBuffer and decode to AudioBuffer
-        const arrayBuffer = await file.arrayBuffer();
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-        ctx.close();
-        setBgmBuffer(audioBuffer);
-        setBgmUrl(file.name); // just for UI display
-        alert('✅ Đã tải nhạc nền: ' + file.name);
-      } catch (err) {
-        alert('❌ Không thể đọc file nhạc. Thử file mp3 khác.');
-        console.error('BGM decode error:', err);
-      }
+      const url = URL.createObjectURL(file);
+      // Create Audio element right here in user gesture context
+      const audio = new Audio(url);
+      audio.loop = true;
+      audio.volume = bgmVolume;
+      // Pre-load the audio
+      audio.load();
+      bgmAudioRef.current = audio;
+      setBgmUrl(file.name);
+      alert('✅ Đã tải nhạc nền: ' + file.name);
     };
     input.click();
   };
@@ -1020,11 +995,13 @@ export default function App() {
                   <div className="font-bold text-sm">Giơ ngón tay</div>
                   <div className="text-xs opacity-70 mt-1">Camera + tay</div>
                 </button>
+                {/* GROUP mode hidden
                 <button onClick={() => setGameMode('GROUP')} className={`p-4 rounded-2xl border-2 transition-all text-center ${gameMode === 'GROUP' ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200 scale-[1.02]' : 'border-gray-200 hover:border-amber-200 hover:bg-amber-50'}`}>
                   <Users size={24} className="mx-auto mb-2" />
                   <div className="font-bold text-sm">Chơi nhóm</div>
                   <div className="text-xs opacity-70 mt-1">Không camera</div>
                 </button>
+                */}
               </div>
             </div>
 
