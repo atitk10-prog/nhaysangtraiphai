@@ -1,0 +1,7 @@
+{
+  "name": "Remix: Remix: trò chơi nghiêng đầu",
+  "description": "A quiz game where you answer by tilting your head left or right using AI face tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
