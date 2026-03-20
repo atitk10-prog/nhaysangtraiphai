@@ -2,17 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaceMesh } from '@mediapipe/face_mesh';
 import * as cam from '@mediapipe/camera_utils';
 import confetti from 'canvas-confetti';
-import { Brain, Camera, CheckCircle2, Play, Plus, Save, Trash2, User, Video, XCircle, Download, Upload, Settings, Timer, Sliders, ArrowLeft, ArrowRight, ImagePlus, X, Volume2, Users, Move, FileDown, Hand, Mic } from 'lucide-react';
+import { Brain, Camera, CheckCircle2, Play, Plus, Save, Trash2, User, Video, XCircle, Download, Upload, Settings, Timer, Sliders, ArrowLeft, ArrowRight, ImagePlus, X, Volume2, Users, Move, Hand, Mic } from 'lucide-react';
 import { generateQuestions, Question } from './services/gemini';
-import { useRegisterSW } from 'virtual:pwa-register/react';
 
 // --- Types ---
 type GameState = 'TEACHER' | 'READY' | 'PLAYING' | 'FINISHED';
 type GameMode = 'TILT' | 'JUMP' | 'GROUP' | 'CLAP' | 'HANDS';
 
 export default function App() {
-  // Register PWA Service Worker
-  useRegisterSW();
 
   const [gameState, setGameState] = useState<GameState>('TEACHER');
   const [questions, setQuestions] = useState<Question[]>(() => {
