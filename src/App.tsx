@@ -41,8 +41,11 @@ export default function App() {
   // Sound settings
   const [sfxVolume, setSfxVolume] = useState(0.5);
   const [bgmVolume, setBgmVolume] = useState(0.2);
-  const [bgmUrl, setBgmUrl] = useState('');
-  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const [bgmBuffer, setBgmBuffer] = useState<AudioBuffer | null>(null);
+  const [bgmUrl, setBgmUrl] = useState(''); // just for UI display
+  const bgmSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const bgmGainRef = useRef<GainNode | null>(null);
+  const bgmRef = useRef<HTMLAudioElement | null>(null); // keep for compatibility
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -121,47 +124,50 @@ export default function App() {
     } catch {}
   };
 
-  // BGM: create audio when URL changes
-  const bgmUrlRef = useRef('');
-  useEffect(() => {
-    if (bgmUrl === bgmUrlRef.current) return; // same URL, skip
-    bgmUrlRef.current = bgmUrl;
-    
-    // Stop old audio
-    if (bgmRef.current) {
-      bgmRef.current.pause();
-      bgmRef.current = null;
+  // BGM: play/stop using AudioContext (same as SFX)
+  const stopBgm = () => {
+    if (bgmSourceRef.current) {
+      try { bgmSourceRef.current.stop(); } catch {}
+      bgmSourceRef.current = null;
     }
-    if (!bgmUrl) return;
-    
-    // Create new audio
-    const audio = new Audio(bgmUrl);
-    audio.loop = true;
-    audio.volume = bgmVolume;
-    bgmRef.current = audio;
-    console.log('BGM: audio created', bgmUrl.substring(0, 50));
-  }, [bgmUrl]);
+  };
 
-  // BGM: play/pause based on game state
   useEffect(() => {
-    const audio = bgmRef.current;
-    if (!audio) return;
-    
-    if (gameState === 'PLAYING') {
-      audio.volume = bgmVolume;
-      console.log('BGM: trying to play...');
-      audio.play()
-        .then(() => console.log('BGM: playing!'))
-        .catch((e) => console.warn('BGM: play blocked -', e.message));
-    } else {
-      audio.pause();
-      console.log('BGM: paused (state:', gameState, ')');
+    // Only play when PLAYING + has buffer
+    if (gameState !== 'PLAYING' || !bgmBuffer) {
+      stopBgm();
+      return;
     }
-  }, [gameState]);
+    
+    // Create AudioContext if needed
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Create gain node for volume
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = bgmVolume;
+    gainNode.connect(ctx.destination);
+    bgmGainRef.current = gainNode;
+    
+    // Create source and play
+    const source = ctx.createBufferSource();
+    source.buffer = bgmBuffer;
+    source.loop = true;
+    source.connect(gainNode);
+    source.start(0);
+    bgmSourceRef.current = source;
+    console.log('BGM: playing via AudioContext!');
+    
+    return () => {
+      try { source.stop(); } catch {}
+      bgmSourceRef.current = null;
+      bgmGainRef.current = null;
+      ctx.close();
+    };
+  }, [gameState, bgmBuffer]);
 
   // BGM: volume control
   useEffect(() => {
-    if (bgmRef.current) bgmRef.current.volume = bgmVolume;
+    if (bgmGainRef.current) bgmGainRef.current.gain.value = bgmVolume;
   }, [bgmVolume]);
 
   // Save questions to localStorage
@@ -292,13 +298,22 @@ export default function App() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'audio/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      // Use blob URL — stays valid as long as page is open
-      const url = URL.createObjectURL(file);
-      setBgmUrl(url);
-      alert('✅ Đã tải nhạc nền: ' + file.name);
+      try {
+        // Read file as ArrayBuffer and decode to AudioBuffer
+        const arrayBuffer = await file.arrayBuffer();
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        ctx.close();
+        setBgmBuffer(audioBuffer);
+        setBgmUrl(file.name); // just for UI display
+        alert('✅ Đã tải nhạc nền: ' + file.name);
+      } catch (err) {
+        alert('❌ Không thể đọc file nhạc. Thử file mp3 khác.');
+        console.error('BGM decode error:', err);
+      }
     };
     input.click();
   };
